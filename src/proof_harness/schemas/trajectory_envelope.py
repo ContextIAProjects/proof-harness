@@ -77,14 +77,18 @@ class Usage(StrictModel):
 
 
 class TrajectoryEnvelope(ArtifactModel):
-    """Raw record of one execution, runner-agnostic by contract."""
+    """Raw record of one execution, runner-agnostic by contract.
+
+    ``context`` is optional: absent means the run was not driven by a
+    compiled context-runtime package (every pre-integration session).
+    """
 
     run_id: str = Field(pattern=RUN_ID_PATTERN)
     task_id: str = Field(pattern=TASK_ID_PATTERN)
     harness_id: str = Field(pattern=HARNESS_ID_PATTERN)
     runner: Runner
     model: ModelInfo
-    context: ContextRef
+    context: ContextRef | None = None
     events: list[TrajectoryEvent] = Field(default_factory=list)
     artifacts: list[TrajectoryArtifact] = Field(default_factory=list)
     usage: Usage

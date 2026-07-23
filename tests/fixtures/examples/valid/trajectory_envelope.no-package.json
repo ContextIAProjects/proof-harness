@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "run_id": "RUN-20260720-1394437683",
+  "task_id": "T-201",
+  "harness_id": "harness-000000",
+  "runner": {
+    "name": "claude-code",
+    "version": "2.1.209"
+  },
+  "model": {
+    "provider": "anthropic",
+    "model": "claude-fable-5",
+    "snapshot": "claude-fable-5"
+  },
+  "events": [
+    {
+      "event_id": "EVT-001",
+      "kind": "tool_call",
+      "tool": "Read",
+      "success": true
+    },
+    {
+      "event_id": "EVT-002",
+      "kind": "tool_call",
+      "tool": "Edit",
+      "success": true
+    }
+  ],
+  "artifacts": [],
+  "usage": {
+    "input_tokens": 5400,
+    "cached_input_tokens": 812000,
+    "output_tokens": 9100,
+    "reasoning_tokens": 0,
+    "tool_calls": 2,
+    "latency_ms": 5400000
+  }
+}

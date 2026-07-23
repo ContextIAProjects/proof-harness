@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://proof-harness.dev/schemas/v1/trajectory_envelope.schema.json",
   "title": "TrajectoryEnvelope",
-  "description": "Raw record of one execution, runner-agnostic by contract: any agent CLI (Claude Code, Codex, OpenCode, ...) maps its telemetry into this envelope via an adapter; no field may assume one provider's event format. External identifiers travel verbatim: context_hash is context-runtime's bare hex sha256, provider snapshot ids keep their producer's format. Sensitive content is never embedded - only artifact:// references and hashes.",
+  "description": "Raw record of one execution, runner-agnostic by contract: any agent CLI (Claude Code, Codex, OpenCode, ...) maps its telemetry into this envelope via an adapter; no field may assume one provider's event format. External identifiers travel verbatim: context_hash is context-runtime's bare hex sha256, provider snapshot ids keep their producer's format. Sensitive content is never embedded - only artifact:// references and hashes. `context` is optional: absent means the run was NOT driven by a compiled context-runtime package (true for every pre-integration session); when present, its shape is unchanged. Amended 2026-07-23 (increment 2, D7) - a widening, so every previously valid document stays valid under schema_version 1.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -12,7 +12,6 @@
     "harness_id",
     "runner",
     "model",
-    "context",
     "events",
     "artifacts",
     "usage"
