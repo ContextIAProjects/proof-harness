@@ -1,5 +1,10 @@
 # proof-harness
 
+[![CI](https://github.com/ContextIAProjects/proof-harness/actions/workflows/ci.yml/badge.svg)](https://github.com/ContextIAProjects/proof-harness/actions/workflows/ci.yml)
+![python](https://img.shields.io/badge/python-3.12%20|%203.13-blue)
+![runtime deps](https://img.shields.io/badge/runtime%20dependencies-2-brightgreen)
+![license](https://img.shields.io/badge/license-MIT-blue)
+
 **The experimental substrate for proof-carrying harness adaptation: canonical
 run artifacts, an append-only experience store, and code references verified
 against a [Grafos](https://github.com/ContextIAProjects/grafos) index. No
