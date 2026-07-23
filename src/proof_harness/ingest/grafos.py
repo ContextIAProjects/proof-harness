@@ -149,6 +149,13 @@ class GrafosResolver:
         return index_id, freshness
 
     # -- public API ----------------------------------------------------------
+    def status_data(self) -> dict[str, Any]:
+        """Raw ``status`` data of the index (read-only; e.g. file counts)."""
+        raw = self._run(["status"], read_only=True)
+        envelope = self._parse_envelope(raw, context="status")
+        data = envelope.get("data")
+        return data if isinstance(data, dict) else {}
+
     def resolve(self, refs: list[str]) -> ResolvedRefs:
         """Verify claimed refs in ONE batch over ONE snapshot; empty refs still
         pin the snapshot via ``status``."""

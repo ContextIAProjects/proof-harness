@@ -10,10 +10,13 @@ from pathlib import Path
 from typing import Any
 
 from proof_harness import __version__
+from proof_harness.adapters.claude_code import adapt_session, load_declaration
+from proof_harness.canonical import canonical_dump
 from proof_harness.errors import ProofHarnessError, ValidationError
 from proof_harness.experience.store import ExperienceStore
 from proof_harness.ingest.grafos import GrafosResolver
 from proof_harness.ingest.service import IngestResult, ReferenceResolver, ingest_trajectory
+from proof_harness.persistence import atomic_write_text
 
 
 def build_resolver(code_root: Path) -> ReferenceResolver:
@@ -77,6 +80,67 @@ def _run_ingest(args: argparse.Namespace) -> tuple[dict[str, Any], list[str]]:
     return _ingest_data(result)
 
 
+def grafos_repo_files(code_root: Path) -> tuple[int | None, list[str]]:
+    """Best-effort file count of the Grafos index (feeds the size bucket)."""
+    try:
+        files = GrafosResolver(code_root).status_data().get("files")
+        return (int(files), []) if isinstance(files, int) else (None, [])
+    except ProofHarnessError as exc:
+        return None, [f"repository size unknown (grafos status failed: {exc.message})"]
+
+
+def _run_adapt(args: argparse.Namespace) -> tuple[dict[str, Any], list[str]]:
+    store = ExperienceStore(Path(args.root))
+    declaration = load_declaration(_load_json_document(args.declaration, "task declaration"))
+    code_root = Path(args.code_root)
+    repo_files, warnings = grafos_repo_files(code_root)
+    result = adapt_session(
+        Path(args.transcript),
+        declaration,
+        store,
+        code_root=code_root,
+        repo_files=repo_files,
+    )
+    warnings.extend(result.warnings)
+
+    out_dir = Path(args.out)
+    written: dict[str, str] = {}
+    for name, model in (
+        ("envelope", result.envelope),
+        ("features", result.features),
+        ("outcome", result.outcome),
+    ):
+        path = out_dir / f"{name}.json"
+        atomic_write_text(
+            path,
+            json.dumps(canonical_dump(model), ensure_ascii=False, indent=2, sort_keys=True)
+            + "\n",
+        )
+        written[name] = str(path)
+
+    data: dict[str, Any] = {
+        "run_id": result.envelope.run_id,
+        "runner": result.envelope.runner.name,
+        "events": len(result.envelope.events),
+        "claimed_refs": result.claimed_refs,
+        "outcome_success": result.outcome.success,
+        "written": written,
+    }
+    if args.ingest:
+        ingest_result = ingest_trajectory(
+            store,
+            build_resolver(code_root),
+            envelope_doc=canonical_dump(result.envelope),
+            features_doc=canonical_dump(result.features),
+            outcome_doc=canonical_dump(result.outcome),
+            claimed_refs=result.claimed_refs,
+        )
+        ingest_data, ingest_warnings = _ingest_data(ingest_result)
+        data["ingest"] = ingest_data
+        warnings.extend(ingest_warnings)
+    return data, warnings
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="proof-harness",
@@ -109,6 +173,26 @@ def _build_parser() -> argparse.ArgumentParser:
         default=".",
         help="Git checkout with a fresh Grafos index the references resolve against",
     )
+
+    adapt = run_sub.add_parser(
+        "adapt", help="turn runner telemetry into canonical artifacts"
+    )
+    adapt.add_argument("runner_name", choices=["claude-code"], help="source runner")
+    adapt.add_argument("transcript", help="session transcript (JSONL)")
+    adapt.add_argument(
+        "--declaration", required=True, help="task declaration JSON (judgment fields)"
+    )
+    adapt.add_argument(
+        "--out", required=True, help="directory for envelope/features/outcome JSON"
+    )
+    adapt.add_argument(
+        "--code-root",
+        default=".",
+        help="Git checkout the verifiers run in (and refs resolve against)",
+    )
+    adapt.add_argument(
+        "--ingest", action="store_true", help="chain straight into run ingest"
+    )
     return parser
 
 
@@ -123,8 +207,9 @@ def main(argv: list[str] | None = None) -> int:
         "warnings": [],
         "errors": [],
     }
+    handlers = {"ingest": _run_ingest, "adapt": _run_adapt}
     try:
-        data, warnings = _run_ingest(args)
+        data, warnings = handlers[args.run_command](args)
         envelope["data"] = data
         envelope["warnings"] = warnings
     except ProofHarnessError as exc:

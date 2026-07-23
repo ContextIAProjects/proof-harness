@@ -35,6 +35,13 @@ this repository is, and *all* it is today.
   (`runner: {name, version}` — `claude-code`, `codex`, `opencode`,
   `synthetic-fixture`, …); nothing in the schema assumes one provider's event
   format. Each future runner plugs in via a telemetry→envelope adapter.
+- **First real adapter: `run adapt claude-code`** — turns a Claude Code
+  session transcript (read-only, post-hoc) into envelope + features + outcome:
+  events from tool_use/tool_result pairs, cached vs fresh tokens split,
+  claimed references taken from the `grafos` queries the agent actually
+  issued, and an outcome grounded in really running the declared verifiers.
+  No prompt or payload content is ever copied. See
+  [docs/adaptador-claude-code.md](docs/adaptador-claude-code.md).
 - **Determinism.** Same inputs → byte-identical store. Canonical JSON (sorted
   keys, compact separators), no wall-clock timestamps in stored lines,
   content-addressed artifacts, and a derived, deterministic `experience_id`.

@@ -100,6 +100,53 @@ def test_unreadable_trajectory_is_a_domain_error(
     assert not (tmp_path / ".proof-harness").exists()
 
 
+def test_adapt_writes_artifacts_and_chains_into_ingest(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from test_adapter_claude_code import SESSION_ID, _transcript_lines
+
+    monkeypatch.setattr(cli, "build_resolver", lambda code_root: FakeResolver())
+    monkeypatch.setattr(cli, "grafos_repo_files", lambda code_root: (53, []))
+    transcript = tmp_path / f"{SESSION_ID}.jsonl"
+    transcript.write_text(
+        "\n".join(json.dumps(r) for r in _transcript_lines()) + "\n", encoding="utf-8"
+    )
+    declaration = tmp_path / "declaration.json"
+    declaration.write_text(
+        json.dumps(
+            {
+                "task_id": "T-201",
+                "task_type": "repository_documentation",
+                "difficulty": "medium",
+                "ambiguity": "low",
+                "risk": "low",
+                "budget": {"input_tokens": 200000, "output_tokens": 30000},
+                "harness_id": "harness-000000",
+                "verifiers": ['python -c "print(1)"'],
+            }
+        ),
+        encoding="utf-8",
+    )
+    out_dir = tmp_path / "out"
+    code, envelope = _run(
+        ["--json", "--root", str(tmp_path), "run", "adapt", "claude-code",
+         str(transcript), "--declaration", str(declaration),
+         "--out", str(out_dir), "--code-root", str(tmp_path), "--ingest"],
+        capsys,
+    )
+    assert code == 0
+    assert envelope["command"] == "run adapt"
+    data = envelope["data"]
+    assert isinstance(data, dict)
+    assert data["run_id"] == "RUN-20260720-1394110003"
+    assert (out_dir / "envelope.json").is_file()
+    assert (out_dir / "features.json").is_file()
+    assert (out_dir / "outcome.json").is_file()
+    ingest = data["ingest"]
+    assert isinstance(ingest, dict) and ingest["created"] is True
+    assert (tmp_path / ".proof-harness" / "experience" / "experiences.jsonl").is_file()
+
+
 def test_code_root_without_git_is_a_dependency_error(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
