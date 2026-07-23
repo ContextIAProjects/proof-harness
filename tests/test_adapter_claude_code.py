@@ -14,6 +14,7 @@ from proof_harness.adapters.claude_code import (
     build_envelope,
     build_features,
     derive_run_id,
+    load_package_context,
     parse_transcript,
 )
 from proof_harness.canonical import canonical_dump, canonical_json
@@ -191,6 +192,43 @@ def test_envelope_and_features_are_deterministic(
             )
         )
     assert dumps[0] == dumps[1]
+
+
+def test_package_identity_travels_verbatim(transcript: Path, tmp_path: Path) -> None:
+    package = tmp_path / "context_package.json"
+    package.write_text(
+        json.dumps(
+            {
+                "content_hash": "ab" * 32,
+                "provider_snapshots": {"grafos": "sha256:0123456789abcdef"},
+                "estimated_tokens": 6949,
+            }
+        ),
+        encoding="utf-8",
+    )
+    context = load_package_context(package)
+    result = adapt_session(
+        transcript,
+        _declaration(),
+        ExperienceStore(tmp_path / "store"),
+        code_root=tmp_path,
+        repo_files=None,
+        package_context=context,
+    )
+    assert result.envelope.context is not None
+    assert result.envelope.context.context_hash == "ab" * 32
+    assert result.envelope.context.provider_snapshots == {
+        "grafos": "sha256:0123456789abcdef"
+    }
+
+
+def test_package_with_broken_identity_is_rejected(tmp_path: Path) -> None:
+    package = tmp_path / "broken_package.json"
+    package.write_text('{"content_hash": "not-a-hash"}', encoding="utf-8")
+    with pytest.raises(ValidationError):
+        load_package_context(package)
+    with pytest.raises(ValidationError):
+        load_package_context(tmp_path / "missing.json")
 
 
 def test_declaration_requires_at_least_one_verifier() -> None:

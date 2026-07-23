@@ -30,6 +30,7 @@ from proof_harness.experience.store import ExperienceStore
 from proof_harness.schemas import (
     Budget,
     ChangedFilesBucket,
+    ContextRef,
     Level,
     ModelInfo,
     Outcome,
@@ -190,8 +191,38 @@ def derive_run_id(summary: SessionSummary) -> str:
     return f"RUN-{summary.first_timestamp:%Y%m%d}-{str(decimal).zfill(3)}"
 
 
+def load_package_context(path: Path) -> ContextRef:
+    """Verbatim identity of a compiled context-runtime package.
+
+    Reads ``content_hash`` and ``provider_snapshots`` exactly as the package
+    states them; anything malformed is an error, never a sentinel.
+    """
+    if not path.is_file():
+        raise ValidationError(f"context package does not exist: {path}")
+    try:
+        document = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValidationError(f"context package is not readable JSON: {exc}") from exc
+    if not isinstance(document, dict):
+        raise ValidationError("context package is not a JSON object")
+    content_hash = document.get("content_hash")
+    snapshots = document.get("provider_snapshots")
+    try:
+        return ContextRef(
+            context_hash=content_hash if isinstance(content_hash, str) else "",
+            provider_snapshots=snapshots if isinstance(snapshots, dict) else {},
+        )
+    except PydanticValidationError as exc:
+        first = exc.errors()[0]
+        raise ValidationError(
+            f"context package carries an invalid identity: {first.get('msg')}"
+        ) from exc
+
+
 def build_envelope(
-    summary: SessionSummary, declaration: TaskDeclaration
+    summary: SessionSummary,
+    declaration: TaskDeclaration,
+    context: ContextRef | None = None,
 ) -> tuple[TrajectoryEnvelope, list[str]]:
     warnings: list[str] = []
     if summary.sidechain_records:
@@ -224,7 +255,9 @@ def build_envelope(
         harness_id=declaration.harness_id,
         runner=Runner(name=RUNNER_NAME, version=summary.runner_version),
         model=ModelInfo(provider="anthropic", model=model, snapshot=model),
-        context=None,  # no compiled package drove this session (D7)
+        # None = no compiled package drove this session (D7); populated
+        # verbatim from the package when the caller provides one.
+        context=context,
         events=events,
         artifacts=[],
         usage=Usage(
@@ -355,10 +388,11 @@ def adapt_session(
     *,
     code_root: Path,
     repo_files: int | None,
+    package_context: ContextRef | None = None,
     verifier_timeout: int = VERIFIER_TIMEOUT_SECONDS,
 ) -> AdaptResult:
     summary = parse_transcript(transcript)
-    envelope, warnings = build_envelope(summary, declaration)
+    envelope, warnings = build_envelope(summary, declaration, package_context)
     features = build_features(summary, declaration, repo_files)
     outcome = run_verifiers(
         code_root, declaration.verifiers, store, timeout=verifier_timeout

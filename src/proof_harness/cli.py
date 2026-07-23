@@ -10,7 +10,11 @@ from pathlib import Path
 from typing import Any
 
 from proof_harness import __version__
-from proof_harness.adapters.claude_code import adapt_session, load_declaration
+from proof_harness.adapters.claude_code import (
+    adapt_session,
+    load_declaration,
+    load_package_context,
+)
 from proof_harness.canonical import canonical_dump
 from proof_harness.errors import ProofHarnessError, ValidationError
 from proof_harness.experience.store import ExperienceStore
@@ -94,12 +98,16 @@ def _run_adapt(args: argparse.Namespace) -> tuple[dict[str, Any], list[str]]:
     declaration = load_declaration(_load_json_document(args.declaration, "task declaration"))
     code_root = Path(args.code_root)
     repo_files, warnings = grafos_repo_files(code_root)
+    package_context = (
+        load_package_context(Path(args.package)) if args.package else None
+    )
     result = adapt_session(
         Path(args.transcript),
         declaration,
         store,
         code_root=code_root,
         repo_files=repo_files,
+        package_context=package_context,
     )
     warnings.extend(result.warnings)
 
@@ -189,6 +197,11 @@ def _build_parser() -> argparse.ArgumentParser:
         "--code-root",
         default=".",
         help="Git checkout the verifiers run in (and refs resolve against)",
+    )
+    adapt.add_argument(
+        "--package",
+        help="compiled context_package.json that drove the session; its "
+        "content_hash and provider_snapshots travel verbatim into the envelope",
     )
     adapt.add_argument(
         "--ingest", action="store_true", help="chain straight into run ingest"
