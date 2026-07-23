@@ -1,0 +1,39 @@
+# harness-000000: unmanaged Claude Code defaults.
+#
+# The reference bundle real pre-integration sessions ran under: no compiled
+# context package, no managed retrieval or memory, the runner's own agentic
+# loop. It exists so every ingested trajectory can point at a REGISTERED,
+# versioned policy instead of a dangling id. Values describe the runner's
+# defaults honestly; policy vocabulary is free-form v1 strings.
+schema_version: 1
+harness_id: harness-000000
+content_hash: sha256:2e5a6520748c49252da39d3b5877b6cec268661bbf0903f5f10c344082832ec7
+created_at: "2026-07-23T00:00:00Z"
+status: active
+scope:
+  task_types: []
+  models: []
+  repositories: []
+dimensions:
+  context:
+    manifest_policy: conversational
+    max_context_tokens: 200000
+    compression: true
+  tools:
+    allowed: [shell, file_read, file_edit, search, web, task_agents]
+    retrieval_top_k: 0
+    retry_policy: model_discretion
+  generation:
+    temperature: 1.0
+    max_output_tokens: 32000
+  orchestration:
+    workflow: agentic_loop
+    max_steps: 1000
+  memory:
+    retrieve_successes: 0
+    retrieve_failures: 0
+    include_global_patterns: false
+  output:
+    require_schema: false
+    require_declared_checks: false
+    fallback: human_review
