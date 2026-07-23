@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "run_id": "RUN-20260723-000001",
+  "task_id": "T-001",
+  "harness_id": "harness-000001",
+  "runner": {
+    "name": "claude-code",
+    "version": "2.1"
+  },
+  "model": {
+    "provider": "anthropic",
+    "model": "claude-sonnet-5",
+    "snapshot": "claude-sonnet-5"
+  },
+  "context": {
+    "context_hash": "fad0e9599382170374f7438c7e60c4902ea2f52f44e2579c1c9fc7495f200e06",
+    "provider_snapshots": {
+      "grafos": "sha256:9767907e90494182"
+    }
+  },
+  "events": [
+    {
+      "event_id": "EVT-001",
+      "kind": "tool_call",
+      "tool": "grafos.query.explain",
+      "input_ref": "artifact://runs/RUN-20260723-000001/events/EVT-001.input.json",
+      "output_ref": "artifact://runs/RUN-20260723-000001/events/EVT-001.output.json",
+      "success": true
+    },
+    {
+      "event_id": "EVT-002",
+      "kind": "check",
+      "tool": "pytest",
+      "output_ref": "artifact://runs/RUN-20260723-000001/events/EVT-002.output.json",
+      "success": true
+    }
+  ],
+  "artifacts": [
+    {
+      "ref": "artifact://runs/RUN-20260723-000001/events/EVT-002.output.json",
+      "sha256": "sha256:3b5d8f1a0c6e4b2d9f7a5c3e1b8d6f4a0f3a1c9be2d47a5c88e01b6f4d2a9c7e",
+      "description": "captured check report"
+    }
+  ],
+  "usage": {
+    "input_tokens": 1200,
+    "cached_input_tokens": 8400,
+    "output_tokens": 950,
+    "reasoning_tokens": 0,
+    "tool_calls": 2,
+    "latency_ms": 41000
+  }
+}

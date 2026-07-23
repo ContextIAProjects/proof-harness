@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "task_id": "T-104",
+  "task_type": "repository_debugging",
+  "difficulty": "extreme",
+  "language": "python",
+  "requires_external_knowledge": false,
+  "requires_tools": true,
+  "requires_code_change": true,
+  "requires_structured_output": false,
+  "repository_size_bucket": "medium",
+  "changed_files_bucket": "unknown",
+  "ambiguity": "medium",
+  "risk": "high",
+  "budget": {
+    "input_tokens": 32000,
+    "output_tokens": 8000
+  }
+}

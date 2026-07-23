@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://proof-harness.dev/schemas/v1/task_features.schema.json",
+  "title": "TaskFeatures",
+  "description": "Information visible BEFORE executing a task. Version 1 is declarative and deterministic: a human or a rule fills it in; learned classification comes later. Bucket and level vocabularies are pinned as v1 enums.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "task_id",
+    "task_type",
+    "difficulty",
+    "language",
+    "requires_external_knowledge",
+    "requires_tools",
+    "requires_code_change",
+    "requires_structured_output",
+    "repository_size_bucket",
+    "changed_files_bucket",
+    "ambiguity",
+    "risk",
+    "budget"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "task_id": { "type": "string", "pattern": "^[A-Z][A-Z0-9]*-[0-9]{3,}$" },
+    "task_type": { "type": "string", "minLength": 1 },
+    "difficulty": { "type": "string", "enum": ["low", "medium", "high"] },
+    "language": { "type": "string", "minLength": 1 },
+    "requires_external_knowledge": { "type": "boolean" },
+    "requires_tools": { "type": "boolean" },
+    "requires_code_change": { "type": "boolean" },
+    "requires_structured_output": { "type": "boolean" },
+    "repository_size_bucket": {
+      "type": "string",
+      "enum": ["small", "medium", "large", "unknown"]
+    },
+    "changed_files_bucket": {
+      "type": "string",
+      "enum": ["none", "few", "many", "unknown"]
+    },
+    "ambiguity": { "type": "string", "enum": ["low", "medium", "high"] },
+    "risk": { "type": "string", "enum": ["low", "medium", "high"] },
+    "budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["input_tokens", "output_tokens"],
+      "properties": {
+        "input_tokens": { "type": "integer", "minimum": 1 },
+        "output_tokens": { "type": "integer", "minimum": 1 }
+      }
+    }
+  }
+}

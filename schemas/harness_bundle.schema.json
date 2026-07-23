@@ -1,0 +1,122 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://proof-harness.dev/schemas/v1/harness_bundle.schema.json",
+  "title": "HarnessBundle",
+  "description": "One complete, immutable harness policy. content_hash is computed over the canonical JSON of {schema_version, harness_id, parent_harness_id, scope, dimensions} with sorted keys; created_at, status and evidence are lifecycle/provenance metadata and stay out of the hash.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "harness_id",
+    "content_hash",
+    "created_at",
+    "status",
+    "scope",
+    "dimensions"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "harness_id": { "type": "string", "pattern": "^harness-[0-9]{3,}$" },
+    "content_hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "parent_harness_id": {
+      "type": ["string", "null"],
+      "pattern": "^harness-[0-9]{3,}$"
+    },
+    "created_at": { "type": "string", "format": "date-time", "minLength": 1 },
+    "status": {
+      "type": "string",
+      "enum": ["candidate", "active", "deprecated", "rejected"]
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["task_types", "models", "repositories"],
+      "description": "Empty array means unrestricted on that axis.",
+      "properties": {
+        "task_types": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "models": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "repositories": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+      }
+    },
+    "dimensions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["context", "tools", "generation", "orchestration", "memory", "output"],
+      "properties": {
+        "context": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["manifest_policy", "max_context_tokens", "compression"],
+          "properties": {
+            "manifest_policy": { "type": "string", "minLength": 1 },
+            "max_context_tokens": { "type": "integer", "minimum": 1 },
+            "compression": { "type": "boolean" }
+          }
+        },
+        "tools": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["allowed", "retrieval_top_k", "retry_policy"],
+          "properties": {
+            "allowed": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+            "retrieval_top_k": { "type": "integer", "minimum": 0 },
+            "retry_policy": { "type": "string", "minLength": 1 }
+          }
+        },
+        "generation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["temperature", "max_output_tokens"],
+          "properties": {
+            "temperature": { "type": "number", "minimum": 0, "maximum": 2 },
+            "max_output_tokens": { "type": "integer", "minimum": 1 }
+          }
+        },
+        "orchestration": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["workflow", "max_steps"],
+          "properties": {
+            "workflow": { "type": "string", "minLength": 1 },
+            "max_steps": { "type": "integer", "minimum": 1 }
+          }
+        },
+        "memory": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["retrieve_successes", "retrieve_failures", "include_global_patterns"],
+          "properties": {
+            "retrieve_successes": { "type": "integer", "minimum": 0 },
+            "retrieve_failures": { "type": "integer", "minimum": 0 },
+            "include_global_patterns": { "type": "boolean" }
+          }
+        },
+        "output": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["require_schema", "require_declared_checks", "fallback"],
+          "properties": {
+            "require_schema": { "type": "boolean" },
+            "require_declared_checks": { "type": "boolean" },
+            "fallback": { "type": "string", "minLength": 1 }
+          }
+        }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["supporting_patterns"],
+      "properties": {
+        "supporting_patterns": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^PAT-[0-9]{3,}$" }
+        },
+        "evaluation_id": {
+          "type": ["string", "null"],
+          "pattern": "^EVAL-[0-9]{3,}$"
+        }
+      }
+    }
+  }
+}

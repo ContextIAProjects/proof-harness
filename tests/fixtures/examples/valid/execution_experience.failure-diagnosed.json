@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "experience_id": "EXP-000002",
+  "run_id": "RUN-20260723-000002",
+  "task_features_ref": "artifact://task-features/T-104.json",
+  "harness_id": "harness-000017",
+  "harness_delta_ref": "artifact://harness-deltas/harness-000017.d1.json",
+  "trajectory_ref": "artifact://trajectories/RUN-20260723-000002.json",
+  "outcome": {
+    "success": false,
+    "primary_reward": 0.0,
+    "verifier_results": [
+      "artifact://verifiers/RUN-20260723-000002/checks.json"
+    ]
+  },
+  "cost": {
+    "total_tokens": 48200,
+    "non_cached_tokens": 15300,
+    "latency_ms": 183000,
+    "monetary_cost": 0.42
+  },
+  "diagnosis": {
+    "primary_dimension": "orchestration",
+    "secondary_dimensions": ["context"],
+    "confidence": 0.72,
+    "evidence_refs": ["EVT-008", "CHECK-002"],
+    "analysis": "The full suite ran before the failure was reproduced, burning budget on unfocused verification."
+  },
+  "validity": {
+    "repository_revision": "git:c9b0c61",
+    "grafos_index_id": "sha256:9767907e90494182",
+    "referenced_symbols": [
+      "context_runtime.services.build_context:build_context"
+    ],
+    "status": "current",
+    "quarantined_refs": [
+      {
+        "ref": "context_runtime.services.legacy:old_compile",
+        "reason": "not verifiable: no candidates"
+      }
+    ]
+  }
+}

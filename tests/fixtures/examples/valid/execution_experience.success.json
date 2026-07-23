@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "experience_id": "EXP-000001",
+  "run_id": "RUN-20260723-000001",
+  "task_features_ref": "artifact://task-features/T-001.json",
+  "harness_id": "harness-000001",
+  "harness_delta_ref": null,
+  "trajectory_ref": "artifact://trajectories/RUN-20260723-000001.json",
+  "outcome": {
+    "success": true,
+    "primary_reward": 1.0,
+    "verifier_results": [
+      "artifact://verifiers/RUN-20260723-000001/checks.json"
+    ]
+  },
+  "cost": {
+    "total_tokens": 10550,
+    "non_cached_tokens": 2150,
+    "latency_ms": 41000,
+    "monetary_cost": null
+  },
+  "validity": {
+    "repository_revision": "git:c9b0c61",
+    "grafos_index_id": "sha256:9767907e90494182",
+    "referenced_symbols": [
+      "context_runtime.services.build_context:build_context"
+    ],
+    "status": "current"
+  }
+}

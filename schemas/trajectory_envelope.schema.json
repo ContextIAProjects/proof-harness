@@ -1,0 +1,125 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://proof-harness.dev/schemas/v1/trajectory_envelope.schema.json",
+  "title": "TrajectoryEnvelope",
+  "description": "Raw record of one execution, runner-agnostic by contract: any agent CLI (Claude Code, Codex, OpenCode, ...) maps its telemetry into this envelope via an adapter; no field may assume one provider's event format. External identifiers travel verbatim: context_hash is context-runtime's bare hex sha256, provider snapshot ids keep their producer's format. Sensitive content is never embedded - only artifact:// references and hashes.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "task_id",
+    "harness_id",
+    "runner",
+    "model",
+    "context",
+    "events",
+    "artifacts",
+    "usage"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "run_id": { "type": "string", "pattern": "^RUN-[0-9]{8}-[0-9]{3,}$" },
+    "task_id": { "type": "string", "pattern": "^[A-Z][A-Z0-9]*-[0-9]{3,}$" },
+    "harness_id": { "type": "string", "pattern": "^harness-[0-9]{3,}$" },
+    "runner": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "description": "The execution surface that produced this trajectory. Free identifier: claude-code, codex, opencode, synthetic-fixture, ...",
+      "properties": {
+        "name": { "type": "string", "pattern": "^[a-z][a-z0-9._-]*$" },
+        "version": { "type": ["string", "null"], "minLength": 1 }
+      }
+    },
+    "model": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider", "model", "snapshot"],
+      "properties": {
+        "provider": { "type": "string", "minLength": 1 },
+        "model": { "type": "string", "minLength": 1 },
+        "snapshot": { "type": "string", "minLength": 1 }
+      }
+    },
+    "context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["context_hash", "provider_snapshots"],
+      "properties": {
+        "context_hash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$",
+          "description": "content_hash of the compiled context-runtime package, verbatim (bare hex)."
+        },
+        "provider_snapshots": {
+          "type": "object",
+          "additionalProperties": false,
+          "patternProperties": {
+            "^[a-z][a-z0-9_-]*$": { "type": "string", "minLength": 1 }
+          },
+          "description": "Provider snapshot ids verbatim from the package, e.g. {\"grafos\": \"sha256:<16 hex>\"}. May be empty."
+        }
+      }
+    },
+    "events": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["event_id", "kind", "success"],
+        "properties": {
+          "event_id": { "type": "string", "pattern": "^EVT-[0-9]{3,}$" },
+          "kind": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Free string in v1; the taxonomy gets pinned when the first real runner adapter lands (Fase 1)."
+          },
+          "tool": { "type": "string", "minLength": 1 },
+          "input_ref": { "$ref": "#/$defs/artifactUri" },
+          "output_ref": { "$ref": "#/$defs/artifactUri" },
+          "success": { "type": "boolean" }
+        }
+      }
+    },
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["ref", "sha256"],
+        "properties": {
+          "ref": { "$ref": "#/$defs/artifactUri" },
+          "sha256": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+          "description": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "usage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "input_tokens",
+        "cached_input_tokens",
+        "output_tokens",
+        "reasoning_tokens",
+        "tool_calls",
+        "latency_ms"
+      ],
+      "properties": {
+        "input_tokens": { "type": "integer", "minimum": 0 },
+        "cached_input_tokens": { "type": "integer", "minimum": 0 },
+        "output_tokens": { "type": "integer", "minimum": 0 },
+        "reasoning_tokens": { "type": "integer", "minimum": 0 },
+        "tool_calls": { "type": "integer", "minimum": 0 },
+        "latency_ms": { "type": "integer", "minimum": 0 }
+      }
+    }
+  },
+  "$defs": {
+    "artifactUri": {
+      "type": "string",
+      "pattern": "^artifact://[A-Za-z0-9][A-Za-z0-9/._-]*$"
+    }
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "run_id": "RUN-20260723-000003",
+  "task_id": "T-001",
+  "harness_id": "harness-000001",
+  "model": {
+    "provider": "anthropic",
+    "model": "claude-sonnet-5",
+    "snapshot": "claude-sonnet-5"
+  },
+  "context": {
+    "context_hash": "fad0e9599382170374f7438c7e60c4902ea2f52f44e2579c1c9fc7495f200e06",
+    "provider_snapshots": {}
+  },
+  "events": [],
+  "artifacts": [],
+  "usage": {
+    "input_tokens": 0,
+    "cached_input_tokens": 0,
+    "output_tokens": 0,
+    "reasoning_tokens": 0,
+    "tool_calls": 0,
+    "latency_ms": 0
+  }
+}

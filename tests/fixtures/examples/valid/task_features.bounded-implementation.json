@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "task_id": "T-001",
+  "task_type": "bounded_implementation",
+  "difficulty": "low",
+  "language": "python",
+  "requires_external_knowledge": false,
+  "requires_tools": false,
+  "requires_code_change": true,
+  "requires_structured_output": true,
+  "repository_size_bucket": "small",
+  "changed_files_bucket": "few",
+  "ambiguity": "low",
+  "risk": "low",
+  "budget": {
+    "input_tokens": 4000,
+    "output_tokens": 2000
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "experience_id": "EXP-000003",
+  "run_id": "RUN-20260723-000003",
+  "task_features_ref": "artifact://task-features/T-001.json",
+  "harness_id": "harness-000001",
+  "trajectory_ref": "artifact://trajectories/RUN-20260723-000003.json",
+  "outcome": {
+    "success": true,
+    "primary_reward": 1.0,
+    "verifier_results": []
+  },
+  "cost": {
+    "total_tokens": 0,
+    "non_cached_tokens": 0,
+    "latency_ms": 0,
+    "monetary_cost": null
+  },
+  "validity": {
+    "repository_revision": "git:c9b0c61",
+    "grafos_index_id": "sha256:9767907e90494182",
+    "referenced_symbols": [],
+    "status": "expired"
+  }
+}

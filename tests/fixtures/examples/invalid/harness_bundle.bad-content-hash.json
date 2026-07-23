@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "harness_id": "harness-000004",
+  "content_hash": "0f3a1c9be2d47a5c88e01b6f4d2a9c7e5b3d8f1a0c6e4b2d9f7a5c3e1b8d6f4a",
+  "created_at": "2026-07-23T09:00:00Z",
+  "status": "candidate",
+  "scope": {
+    "task_types": [],
+    "models": [],
+    "repositories": []
+  },
+  "dimensions": {
+    "context": {
+      "manifest_policy": "task_declared",
+      "max_context_tokens": 32000,
+      "compression": false
+    },
+    "tools": {
+      "allowed": [],
+      "retrieval_top_k": 0,
+      "retry_policy": "none"
+    },
+    "generation": {
+      "temperature": 0.0,
+      "max_output_tokens": 1000
+    },
+    "orchestration": {
+      "workflow": "direct",
+      "max_steps": 1
+    },
+    "memory": {
+      "retrieve_successes": 0,
+      "retrieve_failures": 0,
+      "include_global_patterns": false
+    },
+    "output": {
+      "require_schema": false,
+      "require_declared_checks": false,
+      "fallback": "none"
+    }
+  }
+}
