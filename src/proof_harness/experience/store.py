@@ -51,6 +51,26 @@ class ExperienceStore:
     def find_experience(self, run_id: str) -> dict[str, Any] | None:
         return self._find_by_run_id(self.experiences_path, run_id)
 
+    def experiences_bytes(self) -> bytes:
+        """Exact bytes of the experiences log (empty bank -> b\"\")."""
+        try:
+            return self.experiences_path.read_bytes()
+        except FileNotFoundError:
+            return b""
+
+    def load_experiences(self) -> list[dict[str, Any]]:
+        documents: list[dict[str, Any]] = []
+        for number, line in enumerate(read_jsonl_lines(self.experiences_path), start=1):
+            try:
+                document = json.loads(line)
+            except json.JSONDecodeError as exc:
+                raise ValidationError(
+                    f"corrupt line {number} in {self.experiences_path.name}: {exc}"
+                ) from exc
+            if isinstance(document, dict):
+                documents.append(document)
+        return documents
+
     def artifact_path(self, content_sha256_hex: str) -> Path:
         return self.artifacts_dir / f"{content_sha256_hex}.json"
 
