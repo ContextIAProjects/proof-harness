@@ -23,6 +23,7 @@ from proof_harness.persistence import load_yaml_model
 from proof_harness.schemas import (
     ExecutionExperience,
     HarnessBundle,
+    RetrievalResult,
     TaskFeatures,
     TrajectoryEnvelope,
 )
@@ -36,6 +37,7 @@ MODELS: dict[str, type[BaseModel]] = {
     "task_features": TaskFeatures,
     "trajectory_envelope": TrajectoryEnvelope,
     "execution_experience": ExecutionExperience,
+    "retrieval_result": RetrievalResult,
 }
 
 

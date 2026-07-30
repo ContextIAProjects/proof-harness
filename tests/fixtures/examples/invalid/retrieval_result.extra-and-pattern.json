@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "query": {
+    "task_id": "T-999",
+    "task_type": "bugfix",
+    "any_task_type": false,
+    "strict_validity": false
+  },
+  "pinned": {
+    "bank_content_hash": "NOT-A-SHA",
+    "grafos_index_id": "sha256:0bb29b7b105e2b89"
+  },
+  "results": { "successes": [], "failures": [] },
+  "discarded": [],
+  "generated_at": "2026-07-30T09:00:00Z"
+}

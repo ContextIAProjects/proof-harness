@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "query": {
+    "task_id": "T-999",
+    "task_type": "bugfix",
+    "any_task_type": false,
+    "strict_validity": false
+  },
+  "results": { "successes": [], "failures": [] },
+  "discarded": []
+}
