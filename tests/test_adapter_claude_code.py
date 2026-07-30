@@ -130,6 +130,36 @@ def test_mapping_is_the_normative_one(transcript: Path) -> None:
     }
 
 
+def test_powershell_tool_grafos_queries_are_claimed_refs(tmp_path: Path) -> None:
+    # The first Windows session (T-502) issued its consultations through the
+    # PowerShell tool, not Bash; capture must not depend on which shell tool
+    # carried the command.
+    command = (
+        "grafos query impact dev_scripts.build_zamudio 2>&1 | Out-String; "
+        "grafos memory for dev_scripts.build_parke 2>&1 | Out-String"
+    )
+    lines = [
+        _assistant(
+            "2026-07-30T12:00:00.000Z",
+            [{"type": "tool_use", "id": "toolu_01", "name": "PowerShell",
+              "input": {"command": command}}],
+        ),
+        _record("user", timestamp="2026-07-30T12:00:05.000Z", message={
+            "content": [{"type": "tool_result", "tool_use_id": "toolu_01",
+                         "is_error": False}]}),
+    ]
+    path = tmp_path / f"{SESSION_ID}.jsonl"
+    path.write_text(
+        "\n".join(json.dumps(record) for record in lines) + "\n", encoding="utf-8"
+    )
+
+    summary = parse_transcript(path)
+    assert summary.grafos_refs == {
+        "dev_scripts.build_zamudio",
+        "dev_scripts.build_parke",
+    }
+
+
 def test_query_runtime_is_a_claimed_ref(tmp_path: Path) -> None:
     # The first package-driven session (T-301) checked its new helper with
     # `grafos query runtime` inside a piped compound; capture must not depend

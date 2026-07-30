@@ -161,12 +161,14 @@ def parse_transcript(path: Path) -> SessionSummary:
                 tool_use_id = str(block.get("id") or f"missing-{number}")
                 name = str(block.get("name") or "unknown")
                 summary.tool_uses.append((tool_use_id, name))
-                if name == "Bash":
-                    command = block.get("input", {}).get("command")
-                    if isinstance(command, str):
-                        for pattern in (_GRAFOS_QUERY, _GRAFOS_MEMORY):
-                            for match in pattern.finditer(command):
-                                summary.grafos_refs.add(match.group(2))
+                # Any command-bearing tool counts (Bash on POSIX, PowerShell
+                # on Windows): the claim is what the agent consulted, not
+                # which shell carried it.
+                command = block.get("input", {}).get("command")
+                if isinstance(command, str):
+                    for pattern in (_GRAFOS_QUERY, _GRAFOS_MEMORY):
+                        for match in pattern.finditer(command):
+                            summary.grafos_refs.add(match.group(2))
         elif record_type == "user":
             for block in message.get("content") or []:
                 if isinstance(block, dict) and block.get("type") == "tool_result":
