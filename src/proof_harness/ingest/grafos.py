@@ -34,6 +34,7 @@ _EXIT_HINTS = {
 class ResolvedRefs:
     verified: list[str] = field(default_factory=list)
     quarantined: list[tuple[str, str]] = field(default_factory=list)  # (ref, reason)
+    expansions: list[tuple[str, str]] = field(default_factory=list)  # (claimed, canonical)
     index_id: str = ""
     freshness: str = "unknown"
 
@@ -190,7 +191,10 @@ class GrafosResolver:
             if item.get("ok", False):
                 data = item.get("data")
                 canonical_id = data.get("id") if isinstance(data, dict) else None
-                resolved.verified.append(str(canonical_id) if canonical_id else ref)
+                canonical = str(canonical_id) if canonical_id else ref
+                resolved.verified.append(canonical)
+                if canonical != ref:
+                    resolved.expansions.append((ref, canonical))
             else:
                 errors = item.get("errors") or ["unverifiable reference"]
                 resolved.quarantined.append((ref, "; ".join(str(e) for e in errors)))

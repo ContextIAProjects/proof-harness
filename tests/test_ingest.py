@@ -57,6 +57,63 @@ def _store_bytes(store: ExperienceStore) -> dict[str, bytes]:
     }
 
 
+class ExpandingResolver(FakeResolver):
+    """Mimics an anchor index rebinding a short name to a LOCAL homonym —
+    the T-401 hazard: plausible but semantically wrong verification."""
+
+    def resolve(self, refs: list[str]) -> ResolvedRefs:
+        resolved = ResolvedRefs(index_id=INDEX_ID, freshness="fresh")
+        for ref in refs:
+            if ":" in ref:
+                resolved.verified.append(ref)
+            else:
+                canonical = f"local_package.module:{ref}"
+                resolved.verified.append(canonical)
+                resolved.expansions.append((ref, canonical))
+        return resolved
+
+
+class RecordingResolver(FakeResolver):
+    def __init__(self) -> None:
+        self.seen: list[str] = []
+
+    def resolve(self, refs: list[str]) -> ResolvedRefs:
+        self.seen = list(refs)
+        return super().resolve(refs)
+
+
+def test_short_name_expansion_is_warned(tmp_path: Path) -> None:
+    result = ingest_trajectory(
+        ExperienceStore(tmp_path),
+        ExpandingResolver(),
+        claimed_refs=["atomic_write_text", GOOD_REF],
+        **_inputs(),
+    )
+    assert "local_package.module:atomic_write_text" in result.verified_refs
+    assert any(
+        "short-name ref 'atomic_write_text' was expanded" in warning
+        for warning in result.warnings
+    )
+
+
+def test_strict_refs_quarantines_short_names_unresolved(tmp_path: Path) -> None:
+    resolver = RecordingResolver()
+    result = ingest_trajectory(
+        ExperienceStore(tmp_path),
+        resolver,
+        claimed_refs=["atomic_write_text", GOOD_REF],
+        strict_refs=True,
+        **_inputs(),
+    )
+    assert resolver.seen == [GOOD_REF], "short refs must never reach the resolver"
+    assert result.verified_refs == [GOOD_REF]
+    assert any(
+        ref == "atomic_write_text" and "strict refs" in reason
+        for ref, reason in result.quarantined
+    )
+    assert not result.warnings
+
+
 def test_ingest_writes_the_full_chain(tmp_path: Path) -> None:
     store = ExperienceStore(tmp_path)
     result = ingest_trajectory(

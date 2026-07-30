@@ -81,6 +81,16 @@ def _derive_cost(envelope: TrajectoryEnvelope) -> Cost:
     )
 
 
+STRICT_SHORT_REF_REASON = (
+    "short-name ref is ambiguous across repositories (strict refs): "
+    "claim it fully qualified as package.module:symbol"
+)
+
+
+def _is_qualified(ref: str) -> bool:
+    return ":" in ref
+
+
 def ingest_trajectory(
     store: ExperienceStore,
     resolver: ReferenceResolver,
@@ -89,6 +99,7 @@ def ingest_trajectory(
     features_doc: Any,
     outcome_doc: Any,
     claimed_refs: list[str],
+    strict_refs: bool = False,
 ) -> IngestResult:
     envelope = _validate(envelope_doc, TrajectoryEnvelope, "trajectory envelope")
     features = _validate(features_doc, TaskFeatures, "task features")
@@ -132,13 +143,30 @@ def ingest_trajectory(
             warnings=["already ingested with identical content; nothing appended"],
         )
 
-    # External verification before any write.
+    # External verification before any write. Short (unqualified) refs are the
+    # T-401 hazard: an anchor index rebinds them to a LOCAL homonym, producing
+    # a plausible but semantically wrong verification. Strict mode quarantines
+    # them without ever asking the resolver; default mode resolves but warns.
+    claimed = sorted(set(claimed_refs))
+    strict_quarantined: list[tuple[str, str]] = []
+    if strict_refs:
+        strict_quarantined = [
+            (ref, STRICT_SHORT_REF_REASON) for ref in claimed if not _is_qualified(ref)
+        ]
+        claimed = [ref for ref in claimed if _is_qualified(ref)]
+
     revision = resolver.revision()
-    resolved = resolver.resolve(sorted(set(claimed_refs)))
+    resolved = resolver.resolve(claimed)
+    warnings = [
+        f"short-name ref {claimed_ref!r} was expanded to {canonical!r} by the "
+        "anchor index; claim refs fully qualified in multi-repo sessions"
+        for claimed_ref, canonical in resolved.expansions
+        if not _is_qualified(claimed_ref)
+    ]
 
     features_json = canonical_json(canonical_dump(features))
     verified = sorted(resolved.verified)
-    quarantined = sorted(resolved.quarantined)
+    quarantined = sorted(resolved.quarantined + strict_quarantined)
     experience = ExecutionExperience(
         experience_id=_experience_id(envelope_json),
         run_id=envelope.run_id,
@@ -179,4 +207,5 @@ def ingest_trajectory(
         quarantined=quarantined,
         index_id=resolved.index_id,
         freshness=resolved.freshness,
+        warnings=warnings,
     )

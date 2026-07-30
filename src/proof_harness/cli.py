@@ -81,6 +81,7 @@ def _run_ingest(args: argparse.Namespace) -> tuple[dict[str, Any], list[str]]:
         features_doc=_load_json_document(args.task_features, "task features"),
         outcome_doc=_load_json_document(args.outcome, "outcome"),
         claimed_refs=list(args.ref or []),
+        strict_refs=args.strict_refs,
     )
     return _ingest_data(result)
 
@@ -191,6 +192,7 @@ def _run_adapt(args: argparse.Namespace) -> tuple[dict[str, Any], list[str]]:
             features_doc=canonical_dump(result.features),
             outcome_doc=canonical_dump(result.outcome),
             claimed_refs=result.claimed_refs,
+            strict_refs=args.strict_refs,
         )
         ingest_data, ingest_warnings = _ingest_data(ingest_result)
         data["ingest"] = ingest_data
@@ -231,6 +233,12 @@ def _build_parser() -> argparse.ArgumentParser:
         default=".",
         help="Git checkout with a fresh Grafos index the references resolve against",
     )
+    ingest.add_argument(
+        "--strict-refs",
+        action="store_true",
+        help="quarantine short-name refs instead of letting the anchor index "
+        "rebind them (multi-repo sessions)",
+    )
 
     adapt = run_sub.add_parser(
         "adapt", help="turn runner telemetry into canonical artifacts"
@@ -256,6 +264,12 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     adapt.add_argument(
         "--ingest", action="store_true", help="chain straight into run ingest"
+    )
+    adapt.add_argument(
+        "--strict-refs",
+        action="store_true",
+        help="quarantine short-name claimed refs instead of letting the anchor "
+        "index rebind them (multi-repo sessions)",
     )
 
     experience_parser = subparsers.add_parser(
