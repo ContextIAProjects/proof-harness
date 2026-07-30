@@ -147,6 +147,64 @@ def test_adapt_writes_artifacts_and_chains_into_ingest(
     assert (tmp_path / ".proof-harness" / "experience" / "experiences.jsonl").is_file()
 
 
+def test_experience_search_end_to_end_and_deterministic(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(cli, "build_resolver", lambda code_root: FakeResolver())
+    trajectory, features, outcome = _write_inputs(tmp_path)
+    code, _ = _run(
+        ["--json", "--root", str(tmp_path), "run", "ingest", trajectory,
+         "--task-features", features, "--outcome", outcome,
+         "--ref", "context_runtime.services.build_context:build_context"],
+        capsys,
+    )
+    assert code == 0
+
+    emit_a = tmp_path / "emit-a"
+    code, envelope = _run(
+        ["--json", "--root", str(tmp_path), "experience", "search",
+         "--features", features, "--emit", str(emit_a)],
+        capsys,
+    )
+    assert code == 0
+    assert envelope["command"] == "experience search"
+    data = envelope["data"]
+    assert isinstance(data, dict)
+    assert data["successes"] == 1 and data["failures"] == 0 and data["discarded"] == 0
+    result = data["result"]
+    assert isinstance(result, dict)
+    assert result["pinned"]["grafos_index_id"] == "sha256:fedcba9876543210"
+    assert (emit_a / "retrieval_result.json").is_file()
+    assert (emit_a / "retrieval_result.md").is_file()
+
+    emit_b = tmp_path / "emit-b"
+    code, _ = _run(
+        ["--json", "--root", str(tmp_path), "experience", "search",
+         "--features", features, "--emit", str(emit_b)],
+        capsys,
+    )
+    assert code == 0
+    for name in ("retrieval_result.json", "retrieval_result.md"):
+        assert (emit_a / name).read_bytes() == (emit_b / name).read_bytes()
+
+
+def test_experience_search_rejects_a_query_without_task_type(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(cli, "build_resolver", lambda code_root: FakeResolver())
+    broken = tmp_path / "query.json"
+    broken.write_text(json.dumps({"task_id": "T-900"}), encoding="utf-8")
+    code, envelope = _run(
+        ["--json", "--root", str(tmp_path), "experience", "search",
+         "--features", str(broken)],
+        capsys,
+    )
+    assert code == 2
+    assert envelope["ok"] is False
+    errors = envelope["errors"]
+    assert isinstance(errors, list) and "task_type" in errors[0]["message"]
+
+
 def test_code_root_without_git_is_a_dependency_error(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:

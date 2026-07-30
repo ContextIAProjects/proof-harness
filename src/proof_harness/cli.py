@@ -17,6 +17,7 @@ from proof_harness.adapters.claude_code import (
 )
 from proof_harness.canonical import canonical_dump
 from proof_harness.errors import ProofHarnessError, ValidationError
+from proof_harness.experience.search import render_markdown, search_experiences
 from proof_harness.experience.store import ExperienceStore
 from proof_harness.ingest.grafos import GrafosResolver
 from proof_harness.ingest.service import IngestResult, ReferenceResolver, ingest_trajectory
@@ -82,6 +83,54 @@ def _run_ingest(args: argparse.Namespace) -> tuple[dict[str, Any], list[str]]:
         claimed_refs=list(args.ref or []),
     )
     return _ingest_data(result)
+
+
+def _query_fields(document: Any) -> tuple[str, str]:
+    """task_id/task_type of the query document (D17): a full TaskFeatures or a
+    hand-written declaration both carry them; nothing else is needed."""
+    if not isinstance(document, dict):
+        raise ValidationError("task features must be a JSON object")
+    task_id = document.get("task_id")
+    task_type = document.get("task_type")
+    if not isinstance(task_id, str) or not task_id:
+        raise ValidationError("task features must carry a non-empty task_id")
+    if not isinstance(task_type, str) or not task_type:
+        raise ValidationError("task features must carry a non-empty task_type")
+    return task_id, task_type
+
+
+def _experience_search(args: argparse.Namespace) -> tuple[dict[str, Any], list[str]]:
+    store = ExperienceStore(Path(args.root))
+    resolver = build_resolver(Path(args.code_root))
+    task_id, task_type = _query_fields(
+        _load_json_document(args.features, "task features")
+    )
+    result = search_experiences(
+        store,
+        resolver,
+        task_id=task_id,
+        task_type=task_type,
+        any_task_type=args.any_task_type,
+        strict_validity=args.strict_validity,
+    )
+    data: dict[str, Any] = {
+        "result": canonical_dump(result),
+        "successes": len(result.results.successes),
+        "failures": len(result.results.failures),
+        "discarded": len(result.discarded),
+    }
+    if args.emit:
+        out_dir = Path(args.emit)
+        json_path = out_dir / "retrieval_result.json"
+        md_path = out_dir / "retrieval_result.md"
+        atomic_write_text(
+            json_path,
+            json.dumps(canonical_dump(result), ensure_ascii=False, indent=2, sort_keys=True)
+            + "\n",
+        )
+        atomic_write_text(md_path, render_markdown(result))
+        data["written"] = {"json": str(json_path), "markdown": str(md_path)}
+    return data, []
 
 
 def grafos_repo_files(code_root: Path) -> tuple[int | None, list[str]]:
@@ -167,6 +216,7 @@ def _build_parser() -> argparse.ArgumentParser:
     ingest = run_sub.add_parser(
         "ingest", help="validate, verify and append one trajectory"
     )
+    ingest.set_defaults(handler=_run_ingest, command_label="run ingest")
     ingest.add_argument("trajectory", help="TrajectoryEnvelope JSON file")
     ingest.add_argument("--task-features", required=True, help="TaskFeatures JSON file")
     ingest.add_argument("--outcome", required=True, help="Outcome JSON file")
@@ -185,6 +235,7 @@ def _build_parser() -> argparse.ArgumentParser:
     adapt = run_sub.add_parser(
         "adapt", help="turn runner telemetry into canonical artifacts"
     )
+    adapt.set_defaults(handler=_run_adapt, command_label="run adapt")
     adapt.add_argument("runner_name", choices=["claude-code"], help="source runner")
     adapt.add_argument("transcript", help="session transcript (JSONL)")
     adapt.add_argument(
@@ -206,23 +257,59 @@ def _build_parser() -> argparse.ArgumentParser:
     adapt.add_argument(
         "--ingest", action="store_true", help="chain straight into run ingest"
     )
+
+    experience_parser = subparsers.add_parser(
+        "experience", help="experience bank commands"
+    )
+    experience_sub = experience_parser.add_subparsers(
+        dest="experience_command", required=True
+    )
+    search = experience_sub.add_parser(
+        "search",
+        help="retrieve bank experiences with query-time revalidation "
+        "(deterministic; never mutates the store)",
+    )
+    search.set_defaults(handler=_experience_search, command_label="experience search")
+    search.add_argument(
+        "--features",
+        required=True,
+        help="TaskFeatures (or declaration) JSON carrying task_id and task_type",
+    )
+    search.add_argument(
+        "--code-root",
+        default=".",
+        help="Git checkout with a fresh Grafos index validity revalidates against",
+    )
+    search.add_argument(
+        "--any-task-type",
+        action="store_true",
+        help="relax the task_type hard filter",
+    )
+    search.add_argument(
+        "--strict-validity",
+        action="store_true",
+        help="discard suspect experiences instead of flagging them",
+    )
+    search.add_argument(
+        "--emit",
+        help="directory for retrieval_result.json + retrieval_result.md "
+        "(manifest-embeddable render)",
+    )
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     args = _build_parser().parse_args(argv)
-    command = f"{args.command} {args.run_command}"
     envelope: dict[str, Any] = {
         "schema_version": 1,
         "ok": True,
-        "command": command,
+        "command": args.command_label,
         "data": {},
         "warnings": [],
         "errors": [],
     }
-    handlers = {"ingest": _run_ingest, "adapt": _run_adapt}
     try:
-        data, warnings = handlers[args.run_command](args)
+        data, warnings = args.handler(args)
         envelope["data"] = data
         envelope["warnings"] = warnings
     except ProofHarnessError as exc:
