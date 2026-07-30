@@ -54,7 +54,7 @@ CODE_CHANGE_TOOLS = frozenset({"Edit", "Write", "NotebookEdit"})
 
 _GRAFOS_QUERY = re.compile(
     r"\bgrafos\b[^\n;&|]*?\bquery\s+"
-    r"(?:explain|symbol|impact|callers|callees)\s+([\"']?)([^\s\"']+)\1"
+    r"(?:explain|symbol|impact|callers|callees|runtime)\s+([\"']?)([^\s\"']+)\1"
 )
 _GRAFOS_MEMORY = re.compile(r"\bgrafos\b[^\n;&|]*?\bmemory\s+for\s+([\"']?)([^\s\"']+)\1")
 

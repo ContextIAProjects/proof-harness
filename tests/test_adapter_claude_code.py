@@ -130,6 +130,33 @@ def test_mapping_is_the_normative_one(transcript: Path) -> None:
     }
 
 
+def test_query_runtime_is_a_claimed_ref(tmp_path: Path) -> None:
+    # The first package-driven session (T-301) checked its new helper with
+    # `grafos query runtime` inside a piped compound; capture must not depend
+    # on which ref-bearing query kind the agent picked.
+    command = (
+        "grafos status 2>&1 | grep edges; "
+        "grafos query runtime _replace_with_win32_retry 2>&1 | head -12"
+    )
+    lines = [
+        _assistant(
+            "2026-07-23T11:33:23.000Z",
+            [{"type": "tool_use", "id": "toolu_01", "name": "Bash",
+              "input": {"command": command}}],
+        ),
+        _record("user", timestamp="2026-07-23T11:33:30.000Z", message={
+            "content": [{"type": "tool_result", "tool_use_id": "toolu_01",
+                         "is_error": False}]}),
+    ]
+    path = tmp_path / f"{SESSION_ID}.jsonl"
+    path.write_text(
+        "\n".join(json.dumps(record) for record in lines) + "\n", encoding="utf-8"
+    )
+
+    summary = parse_transcript(path)
+    assert summary.grafos_refs == {"_replace_with_win32_retry"}
+
+
 def test_features_split_derived_vs_declared(transcript: Path) -> None:
     summary = parse_transcript(transcript)
     features = build_features(summary, _declaration(), repo_files=53)
