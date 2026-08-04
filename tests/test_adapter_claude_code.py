@@ -199,6 +199,25 @@ def test_memory_add_refs_are_anchors_not_reads(tmp_path: Path) -> None:
     assert summary.grafos_refs == set()
 
 
+def test_memory_add_with_semicolons_inside_quoted_text(tmp_path: Path) -> None:
+    # The P-001 practice session: the --text carried a semicolon INSIDE the
+    # quotes and the separator guard refused to cross it, so the --refs at
+    # the end were never captured. Quoted separators are not separators.
+    command = (
+        "grafos --root . memory add --type decision --text "
+        "\"En 'context build' el error sale de validate_task; el raise de "
+        "_filesystem_blocks solo se alcanza en llamadas directas\" "
+        "--refs context_runtime.services.tasks:validate_task,"
+        "context_runtime.services.build_context:_filesystem_blocks"
+    )
+    summary = parse_transcript(_single_command_transcript(tmp_path, command))
+    assert summary.grafos_anchor_refs == {
+        "context_runtime.services.tasks:validate_task",
+        "context_runtime.services.build_context:_filesystem_blocks",
+    }
+    assert summary.grafos_refs == set()
+
+
 def test_memory_add_comma_separated_refs_split(tmp_path: Path) -> None:
     summary = parse_transcript(_single_command_transcript(
         tmp_path,

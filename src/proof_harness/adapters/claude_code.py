@@ -63,9 +63,13 @@ _GRAFOS_PATH = re.compile(
 _GRAFOS_MEMORY = re.compile(r"\bgrafos\b[^\n;&|]*?\bmemory\s+for\s+([\"']?)([^\s\"']+)\1")
 # Anchor refs are WRITES (the symbols a lesson/decision gets pinned to): they
 # deserve verification at ingest like any claim, but travel separately so the
-# read-adherence KPI cannot be inflated by them (D6 audit, inc-7).
+# read-adherence KPI cannot be inflated by them (D6 audit, inc-7). Between
+# `add` and `--refs` sits free text in quotes, which may legitimately carry
+# `;`/`|`: a QUOTED separator is not a command separator (P-001 real case).
 _GRAFOS_MEMORY_ADD = re.compile(
-    r"\bgrafos\b[^\n;&|]*?\bmemory\s+add\b[^\n;&|]*?--refs[\s=]+([\"']?)([^\s\"']+)\1"
+    r"\bgrafos\b[^\n;&|]*?\bmemory\s+add\b"
+    r"(?:[^\n;&|\"']|\"[^\"\n]*\"|'[^'\n]*')*?"
+    r"--refs[\s=]+([\"']?)([^\s\"']+)\1"
 )
 
 VERIFIER_TIMEOUT_SECONDS = 600
