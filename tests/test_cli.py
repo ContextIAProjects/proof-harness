@@ -139,6 +139,7 @@ def test_adapt_writes_artifacts_and_chains_into_ingest(
     data = envelope["data"]
     assert isinstance(data, dict)
     assert data["run_id"] == "RUN-20260720-1394110003"
+    assert data["anchor_refs"] == []  # reads and anchors travel separately
     assert (out_dir / "envelope.json").is_file()
     assert (out_dir / "features.json").is_file()
     assert (out_dir / "outcome.json").is_file()

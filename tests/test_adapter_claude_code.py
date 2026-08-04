@@ -160,6 +160,53 @@ def test_powershell_tool_grafos_queries_are_claimed_refs(tmp_path: Path) -> None
     }
 
 
+def _single_command_transcript(tmp_path: Path, command: str) -> Path:
+    lines = [
+        _assistant(
+            "2026-07-30T14:00:00.000Z",
+            [{"type": "tool_use", "id": "toolu_01", "name": "PowerShell",
+              "input": {"command": command}}],
+        ),
+        _record("user", timestamp="2026-07-30T14:00:05.000Z", message={
+            "content": [{"type": "tool_result", "tool_use_id": "toolu_01",
+                         "is_error": False}]}),
+    ]
+    path = tmp_path / f"{SESSION_ID}.jsonl"
+    path.write_text(
+        "\n".join(json.dumps(record) for record in lines) + "\n", encoding="utf-8"
+    )
+    return path
+
+
+def test_query_path_claims_both_refs(tmp_path: Path) -> None:
+    # D6 audit closure #2: `query path A B` carries TWO refs, both claims.
+    summary = parse_transcript(_single_command_transcript(
+        tmp_path,
+        "grafos --json --read-only query path pkg.mod:origin pkg.mod:target --directed",
+    ))
+    assert summary.grafos_refs == {"pkg.mod:origin", "pkg.mod:target"}
+
+
+def test_memory_add_refs_are_anchors_not_reads(tmp_path: Path) -> None:
+    # D6 audit closure #4, the T-502 real case: a lesson pinned via --refs
+    # must get its anchor verified, but never counted as a read.
+    summary = parse_transcript(_single_command_transcript(
+        tmp_path,
+        'grafos memory add --type lesson --text "pal CRLF" '
+        "--refs dev_scripts.build_fase_b:pack_tileset 2>&1 | Out-String",
+    ))
+    assert summary.grafos_anchor_refs == {"dev_scripts.build_fase_b:pack_tileset"}
+    assert summary.grafos_refs == set()
+
+
+def test_memory_add_comma_separated_refs_split(tmp_path: Path) -> None:
+    summary = parse_transcript(_single_command_transcript(
+        tmp_path,
+        "grafos memory add --type decision --text x --refs pkg.a:one,pkg.b:two",
+    ))
+    assert summary.grafos_anchor_refs == {"pkg.a:one", "pkg.b:two"}
+
+
 def test_query_runtime_is_a_claimed_ref(tmp_path: Path) -> None:
     # The first package-driven session (T-301) checked its new helper with
     # `grafos query runtime` inside a piped compound; capture must not depend

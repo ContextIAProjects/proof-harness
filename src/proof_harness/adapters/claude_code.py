@@ -56,7 +56,17 @@ _GRAFOS_QUERY = re.compile(
     r"\bgrafos\b[^\n;&|]*?\bquery\s+"
     r"(?:explain|symbol|impact|callers|callees|runtime)\s+([\"']?)([^\s\"']+)\1"
 )
+_GRAFOS_PATH = re.compile(
+    r"\bgrafos\b[^\n;&|]*?\bquery\s+path\s+"
+    r"([\"']?)([^\s\"']+)\1\s+([\"']?)([^\s\"']+)\3"
+)
 _GRAFOS_MEMORY = re.compile(r"\bgrafos\b[^\n;&|]*?\bmemory\s+for\s+([\"']?)([^\s\"']+)\1")
+# Anchor refs are WRITES (the symbols a lesson/decision gets pinned to): they
+# deserve verification at ingest like any claim, but travel separately so the
+# read-adherence KPI cannot be inflated by them (D6 audit, inc-7).
+_GRAFOS_MEMORY_ADD = re.compile(
+    r"\bgrafos\b[^\n;&|]*?\bmemory\s+add\b[^\n;&|]*?--refs[\s=]+([\"']?)([^\s\"']+)\1"
+)
 
 VERIFIER_TIMEOUT_SECONDS = 600
 _OUTPUT_TAIL_CHARS = 2_000
@@ -92,7 +102,8 @@ class SessionSummary:
     output_tokens: int = 0
     tool_uses: list[tuple[str, str]] = field(default_factory=list)  # (tool_use_id, name)
     tool_results: dict[str, bool] = field(default_factory=dict)  # id -> is_error
-    grafos_refs: set[str] = field(default_factory=set)
+    grafos_refs: set[str] = field(default_factory=set)  # reads (queries)
+    grafos_anchor_refs: set[str] = field(default_factory=set)  # writes (memory add --refs)
     sidechain_records: int = 0
 
 
@@ -101,7 +112,8 @@ class AdaptResult:
     envelope: TrajectoryEnvelope
     features: TaskFeatures
     outcome: Outcome
-    claimed_refs: list[str]
+    claimed_refs: list[str]  # reads only - the read-adherence KPI numerator
+    anchor_refs: list[str]  # memory-add anchors - verified, never counted as reads
     warnings: list[str]
 
 
@@ -169,6 +181,13 @@ def parse_transcript(path: Path) -> SessionSummary:
                     for pattern in (_GRAFOS_QUERY, _GRAFOS_MEMORY):
                         for match in pattern.finditer(command):
                             summary.grafos_refs.add(match.group(2))
+                    for match in _GRAFOS_PATH.finditer(command):
+                        summary.grafos_refs.add(match.group(2))
+                        summary.grafos_refs.add(match.group(4))
+                    for match in _GRAFOS_MEMORY_ADD.finditer(command):
+                        for ref in match.group(2).split(","):
+                            if ref:
+                                summary.grafos_anchor_refs.add(ref)
         elif record_type == "user":
             for block in message.get("content") or []:
                 if isinstance(block, dict) and block.get("type") == "tool_result":
@@ -404,5 +423,6 @@ def adapt_session(
         features=features,
         outcome=outcome,
         claimed_refs=sorted(summary.grafos_refs),
+        anchor_refs=sorted(summary.grafos_anchor_refs),
         warnings=warnings,
     )

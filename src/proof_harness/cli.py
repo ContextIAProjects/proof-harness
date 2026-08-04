@@ -254,6 +254,7 @@ def _run_adapt(args: argparse.Namespace) -> tuple[dict[str, Any], list[str]]:
         "runner": result.envelope.runner.name,
         "events": len(result.envelope.events),
         "claimed_refs": result.claimed_refs,
+        "anchor_refs": result.anchor_refs,
         "outcome_success": result.outcome.success,
         "written": written,
     }
@@ -264,7 +265,7 @@ def _run_adapt(args: argparse.Namespace) -> tuple[dict[str, Any], list[str]]:
             envelope_doc=canonical_dump(result.envelope),
             features_doc=canonical_dump(result.features),
             outcome_doc=canonical_dump(result.outcome),
-            claimed_refs=result.claimed_refs,
+            claimed_refs=result.claimed_refs + result.anchor_refs,
             strict_refs=args.strict_refs,
         )
         ingest_data, ingest_warnings = _ingest_data(ingest_result)
