@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "query": {
+    "task_id": "T-999",
+    "task_type": "bugfix",
+    "any_task_type": false,
+    "strict_validity": false
+  },
+  "banks": [
+    {
+      "label": "local",
+      "result": {
+        "schema_version": 1,
+        "query": {
+          "task_id": "T-999",
+          "task_type": "bugfix",
+          "any_task_type": false,
+          "strict_validity": false
+        },
+        "pinned": {
+          "bank_content_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "grafos_index_id": "sha256:0bb29b7b105e2b89"
+        },
+        "results": {
+          "successes": [
+            {
+              "experience_id": "EXP-40553228755693",
+              "run_id": "RUN-20260730-1385179013",
+              "harness_id": "harness-000001",
+              "task_features_ref": "artifact://runs/artifacts/47450fb432507f64b5ad7213de95645fb19d91c1cef3ea36524673875515b71c.json",
+              "outcome": { "success": true, "primary_reward": 1.0 },
+              "context_present": true,
+              "effective_validity": {
+                "status": "stale",
+                "reasons": ["referenced symbol not resolvable"]
+              },
+              "filters_passed": ["validity"]
+            }
+          ],
+          "failures": []
+        },
+        "discarded": []
+      }
+    }
+  ]
+}

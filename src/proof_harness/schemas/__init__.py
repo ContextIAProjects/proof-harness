@@ -16,6 +16,10 @@ from proof_harness.schemas.harness_bundle import (
     Scope,
     bundle_content_hash,
 )
+from proof_harness.schemas.multi_retrieval_result import (
+    BankResult,
+    MultiRetrievalResult,
+)
 from proof_harness.schemas.retrieval_result import (
     DiscardedExperience,
     DiscardedValidity,
@@ -45,6 +49,7 @@ from proof_harness.schemas.trajectory_envelope import (
 )
 
 __all__ = [
+    "BankResult",
     "Budget",
     "BundleStatus",
     "ChangedFilesBucket",
@@ -60,6 +65,7 @@ __all__ = [
     "HarnessBundle",
     "Level",
     "ModelInfo",
+    "MultiRetrievalResult",
     "Outcome",
     "OutcomeSummary",
     "Pinned",

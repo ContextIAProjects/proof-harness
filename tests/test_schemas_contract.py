@@ -23,6 +23,7 @@ from proof_harness.persistence import load_yaml_model
 from proof_harness.schemas import (
     ExecutionExperience,
     HarnessBundle,
+    MultiRetrievalResult,
     RetrievalResult,
     TaskFeatures,
     TrajectoryEnvelope,
@@ -38,6 +39,7 @@ MODELS: dict[str, type[BaseModel]] = {
     "trajectory_envelope": TrajectoryEnvelope,
     "execution_experience": ExecutionExperience,
     "retrieval_result": RetrievalResult,
+    "multi_retrieval_result": MultiRetrievalResult,
 }
 
 
@@ -84,6 +86,32 @@ def test_every_schema_has_examples_both_ways() -> None:
     for kind in ("valid", "invalid"):
         covered = {_artifact_of(p) for p in _examples(kind)}
         assert covered == artifacts, f"every artifact needs {kind} examples"
+
+
+def test_multi_wrapper_bundles_retrieval_result_verbatim() -> None:
+    # Drift-guard (D34): the copy bundled under $defs must stay byte-equal to
+    # the standalone contract; if retrieval_result v1 ever evolves through a
+    # gate, the wrapper cannot stay silently behind.
+    wrapper = json.loads(
+        (SCHEMAS_DIR / "multi_retrieval_result.schema.json").read_text(encoding="utf-8")
+    )
+    standalone = json.loads(
+        (SCHEMAS_DIR / "retrieval_result.schema.json").read_text(encoding="utf-8")
+    )
+    assert wrapper["$defs"]["retrieval_result"] == standalone
+
+
+def test_duplicate_bank_labels_are_rejected_by_the_model() -> None:
+    # Uniqueness is inexpressible in reasonable JSON Schema; the model layer
+    # carries it (same pattern as reasons-required-when-not-current).
+    document = json.loads(
+        (EXAMPLES_DIR / "valid" / "multi_retrieval_result.one-bank.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    document["banks"] = [document["banks"][0], document["banks"][0]]
+    with pytest.raises(PydanticValidationError):
+        MultiRetrievalResult.model_validate(document)
 
 
 def test_bundle_loads_from_yaml(tmp_path: Path) -> None:

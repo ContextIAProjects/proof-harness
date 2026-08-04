@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "banks": [
+    {
+      "label": "local",
+      "result": {
+        "schema_version": 1,
+        "query": {
+          "task_id": "T-999",
+          "task_type": "bugfix",
+          "any_task_type": false,
+          "strict_validity": false
+        },
+        "pinned": {
+          "bank_content_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "grafos_index_id": "sha256:0bb29b7b105e2b89"
+        },
+        "results": { "successes": [], "failures": [] },
+        "discarded": []
+      }
+    }
+  ],
+  "generated_at": "2026-07-30T14:00:00Z"
+}
