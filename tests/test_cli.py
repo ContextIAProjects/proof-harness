@@ -205,6 +205,86 @@ def test_experience_search_rejects_a_query_without_task_type(
     assert isinstance(errors, list) and "task_type" in errors[0]["message"]
 
 
+def test_experience_search_banks_end_to_end(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(cli, "build_resolver", lambda code_root: FakeResolver())
+    for bank in ("eco", "local"):
+        (tmp_path / bank).mkdir()
+        trajectory, features, outcome = _write_inputs(tmp_path / bank)
+        code, _ = _run(
+            ["--json", "--root", str(tmp_path / bank), "run", "ingest", trajectory,
+             "--task-features", features, "--outcome", outcome],
+            capsys,
+        )
+        assert code == 0
+
+    banks_file = tmp_path / "banks.json"
+    banks_file.write_text(
+        json.dumps([
+            {"label": "eco", "root": str(tmp_path / "eco"),
+             "code_root": str(tmp_path / "eco")},
+            {"label": "local", "root": str(tmp_path / "local"),
+             "code_root": str(tmp_path / "local")},
+        ]),
+        encoding="utf-8",
+    )
+    features_path = tmp_path / "eco" / "features.json"
+    emit_a = tmp_path / "emit-a"
+    code, envelope = _run(
+        ["--json", "experience", "search", "--features", str(features_path),
+         "--banks", str(banks_file), "--emit", str(emit_a)],
+        capsys,
+    )
+    assert code == 0
+    assert envelope["command"] == "experience search"
+    data = envelope["data"]
+    assert isinstance(data, dict)
+    counts = data["counts"]
+    assert isinstance(counts, dict) and set(counts) == {"eco", "local"}
+    result = data["result"]
+    assert isinstance(result, dict)
+    assert [bank["label"] for bank in result["banks"]] == ["eco", "local"]
+    assert (emit_a / "multi_retrieval_result.json").is_file()
+    assert (emit_a / "retrieval_result.md").is_file()
+    assert (emit_a / "eco" / "retrieval_result.json").is_file()
+    assert (emit_a / "local" / "retrieval_result.json").is_file()
+
+    emit_b = tmp_path / "emit-b"
+    code, _ = _run(
+        ["--json", "experience", "search", "--features", str(features_path),
+         "--banks", str(banks_file), "--emit", str(emit_b)],
+        capsys,
+    )
+    assert code == 0
+    for name in ("multi_retrieval_result.json", "retrieval_result.md"):
+        assert (emit_a / name).read_bytes() == (emit_b / name).read_bytes()
+
+
+def test_banks_is_mutually_exclusive_with_root_and_code_root(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(cli, "build_resolver", lambda code_root: FakeResolver())
+    query = tmp_path / "query.json"
+    query.write_text(
+        json.dumps({"task_id": "T-900", "task_type": "bugfix"}), encoding="utf-8"
+    )
+    banks_file = tmp_path / "banks.json"
+    banks_file.write_text(
+        json.dumps([{"label": "eco", "root": str(tmp_path),
+                     "code_root": str(tmp_path)}]),
+        encoding="utf-8",
+    )
+    code, envelope = _run(
+        ["--json", "--root", str(tmp_path), "experience", "search",
+         "--features", str(query), "--banks", str(banks_file)],
+        capsys,
+    )
+    assert code == 2
+    errors = envelope["errors"]
+    assert isinstance(errors, list) and "mutually exclusive" in errors[0]["message"]
+
+
 def test_code_root_without_git_is_a_dependency_error(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:

@@ -6,8 +6,17 @@ import json
 from pathlib import Path
 from typing import Any
 
+import pytest
+
 from proof_harness.canonical import canonical_model_json
-from proof_harness.experience.search import render_markdown, search_experiences
+from proof_harness.errors import ValidationError
+from proof_harness.experience.search import (
+    BankSpec,
+    render_markdown,
+    render_markdown_multi,
+    search_banks,
+    search_experiences,
+)
 from proof_harness.experience.store import ExperienceStore
 from proof_harness.ingest.grafos import ResolvedRefs
 from proof_harness.ingest.service import ingest_trajectory
@@ -221,6 +230,71 @@ def test_search_never_mutates_the_store(tmp_path: Path) -> None:
         if path.is_file()
     }
     assert after == before
+
+
+def _two_banks(tmp_path: Path) -> tuple[BankSpec, BankSpec]:
+    eco_store = ExperienceStore(tmp_path / "eco")
+    _ingest(eco_store, run_id="RUN-20260723-000001", task_id="T-001")
+    local_store = ExperienceStore(tmp_path / "local")
+    _ingest(local_store, run_id="RUN-20260730-000002", task_id="T-002",
+            task_type="refactoring", context=False)
+    return (
+        BankSpec(label="ecosistema", store=eco_store, resolver=StubResolver()),
+        BankSpec(label="local", store=local_store,
+                 resolver=StubResolver(index_id="sha256:fedcba9876543210")),
+    )
+
+
+def test_search_banks_composes_the_singles_in_order(tmp_path: Path) -> None:
+    eco, local = _two_banks(tmp_path)
+
+    multi = search_banks([eco, local], task_id="T-900",
+                         task_type="refactoring", any_task_type=True)
+
+    assert [bank.label for bank in multi.banks] == ["ecosistema", "local"]
+    for spec, bank in zip((eco, local), multi.banks, strict=True):
+        single = search_experiences(
+            spec.store, spec.resolver,
+            task_id="T-900", task_type="refactoring", any_task_type=True,
+        )
+        assert canonical_model_json(bank.result) == canonical_model_json(single), (
+            "native composition must equal the manual single, byte for byte"
+        )
+    assert multi.banks[0].result.pinned.grafos_index_id == INGEST_INDEX
+    assert multi.banks[1].result.pinned.grafos_index_id == "sha256:fedcba9876543210"
+
+
+def test_search_banks_is_deterministic_and_labels_unique(tmp_path: Path) -> None:
+    eco, local = _two_banks(tmp_path)
+
+    first = canonical_model_json(
+        search_banks([eco, local], task_id="T-900", task_type="refactoring",
+                     any_task_type=True)
+    )
+    second = canonical_model_json(
+        search_banks([eco, local], task_id="T-900", task_type="refactoring",
+                     any_task_type=True)
+    )
+    assert first == second
+
+    with pytest.raises(ValidationError):
+        search_banks([eco, eco], task_id="T-900", task_type="refactoring")
+    with pytest.raises(ValidationError):
+        search_banks([], task_id="T-900", task_type="refactoring")
+
+
+def test_multi_render_has_one_section_per_bank(tmp_path: Path) -> None:
+    eco, local = _two_banks(tmp_path)
+    multi = search_banks([eco, local], task_id="T-900",
+                         task_type="refactoring", any_task_type=True)
+
+    rendered = render_markdown_multi(multi)
+
+    assert rendered.startswith("# Retrieved experience for T-900\n")
+    assert "- banks: ecosistema, local" in rendered
+    assert "## Bank: ecosistema" in rendered and "## Bank: local" in rendered
+    assert rendered.count("- pinned: bank sha256:") == 2
+    assert render_markdown_multi(multi) == rendered
 
 
 def test_markdown_render_is_provenance_first(tmp_path: Path) -> None:

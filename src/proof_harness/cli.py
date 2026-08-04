@@ -17,7 +17,13 @@ from proof_harness.adapters.claude_code import (
 )
 from proof_harness.canonical import canonical_dump
 from proof_harness.errors import ProofHarnessError, ValidationError
-from proof_harness.experience.search import render_markdown, search_experiences
+from proof_harness.experience.search import (
+    BankSpec,
+    render_markdown,
+    render_markdown_multi,
+    search_banks,
+    search_experiences,
+)
 from proof_harness.experience.store import ExperienceStore
 from proof_harness.ingest.grafos import GrafosResolver
 from proof_harness.ingest.service import IngestResult, ReferenceResolver, ingest_trajectory
@@ -72,7 +78,7 @@ def _ingest_data(result: IngestResult) -> tuple[dict[str, Any], list[str]]:
 
 
 def _run_ingest(args: argparse.Namespace) -> tuple[dict[str, Any], list[str]]:
-    store = ExperienceStore(Path(args.root))
+    store = ExperienceStore(Path(args.root or "."))
     resolver = build_resolver(Path(args.code_root))
     result = ingest_trajectory(
         store,
@@ -100,12 +106,83 @@ def _query_fields(document: Any) -> tuple[str, str]:
     return task_id, task_type
 
 
+def _pretty(document: dict[str, Any]) -> str:
+    return json.dumps(document, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+
+
+def _load_banks(path_text: str) -> list[dict[str, str]]:
+    document = _load_json_document(path_text, "banks file")
+    if not isinstance(document, list) or not document:
+        raise ValidationError("banks file must be a non-empty JSON array")
+    banks: list[dict[str, str]] = []
+    for number, entry in enumerate(document, start=1):
+        if not isinstance(entry, dict):
+            raise ValidationError(f"banks file entry {number} must be an object")
+        missing = [key for key in ("label", "root", "code_root")
+                   if not isinstance(entry.get(key), str) or not entry.get(key)]
+        if missing:
+            raise ValidationError(
+                f"banks file entry {number} needs non-empty {', '.join(missing)}"
+            )
+        banks.append({"label": entry["label"], "root": entry["root"],
+                      "code_root": entry["code_root"]})
+    return banks
+
+
 def _experience_search(args: argparse.Namespace) -> tuple[dict[str, Any], list[str]]:
-    store = ExperienceStore(Path(args.root))
-    resolver = build_resolver(Path(args.code_root))
     task_id, task_type = _query_fields(
         _load_json_document(args.features, "task features")
     )
+    if args.banks:
+        if args.root is not None or args.code_root is not None:
+            raise ValidationError(
+                "--banks is mutually exclusive with --root/--code-root: "
+                "each bank carries its own store and anchor in the banks file"
+            )
+        specs = [
+            BankSpec(
+                label=entry["label"],
+                store=ExperienceStore(Path(entry["root"])),
+                resolver=build_resolver(Path(entry["code_root"])),
+            )
+            for entry in _load_banks(args.banks)
+        ]
+        multi = search_banks(
+            specs,
+            task_id=task_id,
+            task_type=task_type,
+            any_task_type=args.any_task_type,
+            strict_validity=args.strict_validity,
+        )
+        data: dict[str, Any] = {
+            "result": canonical_dump(multi),
+            "counts": {
+                bank.label: {
+                    "successes": len(bank.result.results.successes),
+                    "failures": len(bank.result.results.failures),
+                    "discarded": len(bank.result.discarded),
+                }
+                for bank in multi.banks
+            },
+        }
+        if args.emit:
+            out_dir = Path(args.emit)
+            written: dict[str, str] = {}
+            json_path = out_dir / "multi_retrieval_result.json"
+            atomic_write_text(json_path, _pretty(canonical_dump(multi)))
+            written["json"] = str(json_path)
+            md_path = out_dir / "retrieval_result.md"
+            atomic_write_text(md_path, render_markdown_multi(multi))
+            written["markdown"] = str(md_path)
+            for bank in multi.banks:
+                bank_path = out_dir / bank.label / "retrieval_result.json"
+                atomic_write_text(bank_path, _pretty(canonical_dump(bank.result)))
+                written[bank.label] = str(bank_path)
+            data["written"] = written
+        return data, []
+
+    store = ExperienceStore(Path(args.root or "."))
+    resolver = build_resolver(Path(args.code_root or "."))
     result = search_experiences(
         store,
         resolver,
@@ -114,7 +191,7 @@ def _experience_search(args: argparse.Namespace) -> tuple[dict[str, Any], list[s
         any_task_type=args.any_task_type,
         strict_validity=args.strict_validity,
     )
-    data: dict[str, Any] = {
+    data = {
         "result": canonical_dump(result),
         "successes": len(result.results.successes),
         "failures": len(result.results.failures),
@@ -124,11 +201,7 @@ def _experience_search(args: argparse.Namespace) -> tuple[dict[str, Any], list[s
         out_dir = Path(args.emit)
         json_path = out_dir / "retrieval_result.json"
         md_path = out_dir / "retrieval_result.md"
-        atomic_write_text(
-            json_path,
-            json.dumps(canonical_dump(result), ensure_ascii=False, indent=2, sort_keys=True)
-            + "\n",
-        )
+        atomic_write_text(json_path, _pretty(canonical_dump(result)))
         atomic_write_text(md_path, render_markdown(result))
         data["written"] = {"json": str(json_path), "markdown": str(md_path)}
     return data, []
@@ -144,7 +217,7 @@ def grafos_repo_files(code_root: Path) -> tuple[int | None, list[str]]:
 
 
 def _run_adapt(args: argparse.Namespace) -> tuple[dict[str, Any], list[str]]:
-    store = ExperienceStore(Path(args.root))
+    store = ExperienceStore(Path(args.root or "."))
     declaration = load_declaration(_load_json_document(args.declaration, "task declaration"))
     code_root = Path(args.code_root)
     repo_files, warnings = grafos_repo_files(code_root)
@@ -209,7 +282,10 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--json", action="store_true", help="emit the JSON envelope")
     parser.add_argument("--debug", action="store_true", help="show tracebacks")
     parser.add_argument(
-        "--root", default=".", help="directory holding the .proof-harness store"
+        "--root",
+        default=None,
+        help="directory holding the .proof-harness store (default: current "
+        "directory; mutually exclusive with `experience search --banks`)",
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -291,8 +367,15 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     search.add_argument(
         "--code-root",
-        default=".",
-        help="Git checkout with a fresh Grafos index validity revalidates against",
+        default=None,
+        help="Git checkout with a fresh Grafos index validity revalidates "
+        "against (default: current directory; mutually exclusive with --banks)",
+    )
+    search.add_argument(
+        "--banks",
+        help="JSON file listing banks to search in order: "
+        '[{"label", "root", "code_root"}] - each bank revalidates against '
+        "its OWN anchor; mutually exclusive with --root/--code-root",
     )
     search.add_argument(
         "--any-task-type",

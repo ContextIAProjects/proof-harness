@@ -16,6 +16,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Sequence
+from dataclasses import dataclass
 from typing import Any
 
 from pydantic import BaseModel
@@ -25,9 +27,11 @@ from proof_harness.errors import ValidationError
 from proof_harness.experience.store import ExperienceStore
 from proof_harness.ingest.service import ReferenceResolver
 from proof_harness.schemas import (
+    BankResult,
     DiscardedExperience,
     DiscardedValidity,
     ExecutionExperience,
+    MultiRetrievalResult,
     OutcomeSummary,
     Pinned,
     RetrievalResult,
@@ -202,24 +206,12 @@ def search_experiences(
     )
 
 
-def render_markdown(result: RetrievalResult) -> str:
-    """Deterministic short render for a context manifest to embed as a plain
-    ``path`` entry: provenance first, no timestamps, no machine paths."""
-    query = result.query
-    lines = [
-        f"# Retrieved experience for {query.task_id}",
-        "",
-        f"- query: task_type={query.task_type} "
-        f"(any_task_type={str(query.any_task_type).lower()}, "
-        f"strict_validity={str(query.strict_validity).lower()})",
-        f"- pinned: bank sha256:{result.pinned.bank_content_hash} "
-        f"| grafos {result.pinned.grafos_index_id}",
-    ]
+def _render_body(result: RetrievalResult, lines: list[str], heading: str) -> None:
     for title, items in (
         ("Successes", result.results.successes),
         ("Failures", result.results.failures),
     ):
-        lines += ["", f"## {title}", ""]
+        lines += ["", f"{heading} {title}", ""]
         if not items:
             lines.append("(none)")
         for item in items:
@@ -231,8 +223,98 @@ def render_markdown(result: RetrievalResult) -> str:
             )
             lines.extend(f"  - {reason}" for reason in item.effective_validity.reasons)
             lines.append(f"  - filters: {', '.join(item.filters_passed)}")
-    lines += ["", "## Discarded", ""]
+    lines += ["", f"{heading} Discarded", ""]
     if not result.discarded:
         lines.append("(none)")
     lines.extend(f"- {d.experience_id}: {d.reason}" for d in result.discarded)
+
+
+def _query_line(query: SearchQuery) -> str:
+    return (
+        f"- query: task_type={query.task_type} "
+        f"(any_task_type={str(query.any_task_type).lower()}, "
+        f"strict_validity={str(query.strict_validity).lower()})"
+    )
+
+
+def render_markdown(result: RetrievalResult) -> str:
+    """Deterministic short render for a context manifest to embed as a plain
+    ``path`` entry: provenance first, no timestamps, no machine paths."""
+    lines = [
+        f"# Retrieved experience for {result.query.task_id}",
+        "",
+        _query_line(result.query),
+        f"- pinned: bank sha256:{result.pinned.bank_content_hash} "
+        f"| grafos {result.pinned.grafos_index_id}",
+    ]
+    _render_body(result, lines, "##")
+    return "\n".join(lines) + "\n"
+
+
+@dataclass(frozen=True)
+class BankSpec:
+    """One bank to search: its store and ITS OWN anchor resolver (D33)."""
+
+    label: str
+    store: ExperienceStore
+    resolver: ReferenceResolver
+
+
+def search_banks(
+    banks: Sequence[BankSpec],
+    *,
+    task_id: str,
+    task_type: str,
+    any_task_type: bool = False,
+    strict_validity: bool = False,
+) -> MultiRetrievalResult:
+    """One deterministic search over N banks, each revalidated against its
+    own anchor; bank order (the banks-file order) is canonical."""
+    if not banks:
+        raise ValidationError("at least one bank is required")
+    labels = [bank.label for bank in banks]
+    if len(labels) != len(set(labels)):
+        raise ValidationError(f"bank labels must be unique: {labels}")
+    return MultiRetrievalResult(
+        query=SearchQuery(
+            task_id=task_id,
+            task_type=task_type,
+            any_task_type=any_task_type,
+            strict_validity=strict_validity,
+        ),
+        banks=[
+            BankResult(
+                label=bank.label,
+                result=search_experiences(
+                    bank.store,
+                    bank.resolver,
+                    task_id=task_id,
+                    task_type=task_type,
+                    any_task_type=any_task_type,
+                    strict_validity=strict_validity,
+                ),
+            )
+            for bank in banks
+        ],
+    )
+
+
+def render_markdown_multi(result: MultiRetrievalResult) -> str:
+    """One manifest-embeddable render, one section per bank — each with its
+    own provenance and pinned pair."""
+    lines = [
+        f"# Retrieved experience for {result.query.task_id}",
+        "",
+        _query_line(result.query),
+        f"- banks: {', '.join(bank.label for bank in result.banks)}",
+    ]
+    for bank in result.banks:
+        lines += [
+            "",
+            f"## Bank: {bank.label}",
+            "",
+            f"- pinned: bank sha256:{bank.result.pinned.bank_content_hash} "
+            f"| grafos {bank.result.pinned.grafos_index_id}",
+        ]
+        _render_body(bank.result, lines, "###")
     return "\n".join(lines) + "\n"
